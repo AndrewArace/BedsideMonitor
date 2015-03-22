@@ -1,9 +1,4 @@
-//*****************************************************************************
-/// @file
-/// @brief
-///   Arduino SmartThings Shield LED Example 
-//*****************************************************************************
-#include <SoftwareSerial.h>   //TODO need to set due to some weird wire language linker, should we absorb this whole library into smartthings
+#include <SoftwareSerial.h>
 #include <SmartThings.h>
 
 #define PIN_THING_RX    3
@@ -12,31 +7,149 @@
 SmartThingsCallout_t messageCallout;    // call out function forward decalaration
 SmartThings smartthing(PIN_THING_RX, PIN_THING_TX, messageCallout);  // constructor
 
-int ledPin = 13;
+const int ledPin = 13;
+
+const int ALERT_PIN =  12;
+const int ALERT_REPEAT = 5;
+
 bool isDebugEnabled;    // enable or disable debug in this example
-int stateLED;           // state to track last set value of LED
+
+//front door motion
+bool hasFrontDoorMotion;
+
+//side porch motion
+bool hasSidePorchMotion;
+
 
 void setup() {
   // setup default state of global variables
   isDebugEnabled = true;
-  stateLED = 0;                 // matches state of hardware pin set below
-
+  hasFrontDoorMotion = false;
+  hasSidePorchMotion = false;
+  
   // setup hardware pins 
   pinMode(ledPin, OUTPUT);     // define PIN_LED as an output
   digitalWrite(ledPin, LOW);   // set value to LOW (off) to match stateLED=0
 
-  if (isDebugEnabled) { // setup debug serial port
-    Serial.begin(9600);         // setup serial with a baud rate of 9600
-    Serial.println("setup..");  // print out 'setup..' on start
+  pinMode(ALERT_PIN, OUTPUT);
+
+  if (isDebugEnabled) {
+    Serial.begin(9600);
+    Serial.println("setup.."); 
+    runTests();
   }
 }
 
+void runTests() {
+/*
+  Serial.println("alertTone(front)"); 
+  alertTone("front");
+  delay(1000);
+  
+  Serial.println("alertTone(side)"); 
+  alertTone("side");
+  delay(1000);
+*/
+  Serial.println("setMotion(front, true)"); 
+  setMotion("front", true);
+  delay(1000);  
+  
+  Serial.println("setMotion(front, false)"); 
+  setMotion("front", false);
+  delay(1000); 
+  
+  Serial.println("setMotion(side, true)"); 
+  setMotion("side", true);
+  delay(1000);  
+  
+  Serial.println("setMotion(side, false)"); 
+  setMotion("side", false);
+  delay(1000); 
+}
 
 void loop() {
   // run smartthing logic
   smartthing.run();
 }
 
+
+void messageCallout(String message) {
+  // if debug is enabled print out the received message
+  if (isDebugEnabled) {
+    Serial.print("Received message: '");
+    Serial.print(message);
+    Serial.println("' ");
+  }
+
+  if (message.equals("frontDoorMotion.active")) {
+    setMotion("front", true);    
+  }
+  else if (message.equals("frontDoorMotion.inactive")) {
+    setMotion("front", false);
+  }
+  else if (message.equals("sidePorchMotion.active")) {
+    setMotion("side", true);
+  }
+  else if (message.equals("sidePorchMotion.inactive")) {
+    setMotion("side", false);
+  }
+}
+
+void setMotion(String area, bool active) {
+  if(area.equals("front")) {
+    if(!active) {
+      hasFrontDoorMotion = false;
+      smartthing.shieldSetLED(0, 0, 0);
+    }
+    else if(active && !hasFrontDoorMotion) {
+      //was just activated for the first time
+      smartthing.shieldSetLED(0, 1, 0);
+      alertTone("front");
+    }
+    else {
+      //still active
+    }
+  }
+  else if(area.equals("side")) {
+    if(!active) {
+      hasSidePorchMotion = false;
+      smartthing.shieldSetLED(0, 0, 0);
+    }
+    else if(active && !hasSidePorchMotion) {
+      //was just activated for the first time
+      smartthing.shieldSetLED(1, 0, 0);
+      alertTone("side");
+    }
+    else {
+      //still active
+    }
+  }
+}
+
+
+void alertTone(String area) {
+  if(area.equals("front")) {
+    for(int i = 0; i < ALERT_REPEAT; i++) {
+      tone(ALERT_PIN, 1245);  
+      delay(300);
+      noTone(ALERT_PIN);
+      delay(300);
+    }
+  }
+  else if(area.equals("side")) {
+    for(int i = 0; i < ALERT_REPEAT; i++) {
+      tone(ALERT_PIN, 988);  
+      delay(300);  
+      noTone(ALERT_PIN);
+      delay(300);
+    }
+  }
+
+  noTone(ALERT_PIN);
+}
+
+
+/*
 void on() {
   stateLED = 1;                 // save state as 1 (on)
   digitalWrite(ledPin, HIGH);  // turn LED on
@@ -80,28 +193,6 @@ void hello() {
   delay(200);
   smartthing.shieldSetLED(0, 0, 0);
   smartthing.send("fancy");
-
 }
-
-
-void messageCallout(String message) {
-  // if debug is enabled print out the received message
-  if (isDebugEnabled) {
-    Serial.print("Received message: '");
-    Serial.print(message);
-    Serial.println("' ");
-  }
-
-  // if message contents equals to 'on' then call on() function
-  // else if message contents equals to 'off' then call off() function
-  if (message.equals("on")) {
-    on();
-  }
-  else if (message.equals("off")) {
-    off();
-  }
-  else if (message.equals("hello")) {
-    hello();
-  }
-}
+*/
 
